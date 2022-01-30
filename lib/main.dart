@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(FriendlyChatApp());
+  runApp(const FriendlyChatApp());
 }
+
+String _name = "Omer maki";
 
 class FriendlyChatApp extends StatelessWidget {
   const FriendlyChatApp({
@@ -18,6 +20,47 @@ class FriendlyChatApp extends StatelessWidget {
   }
 }
 
+class ChatMessage extends StatelessWidget {
+  const ChatMessage({
+    required this.text,
+    required this.animationController,
+    Key? key,
+  }) : super(key: key);
+  final String text;
+  final AnimationController animationController;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizeTransition(
+      sizeFactor:
+          CurvedAnimation(parent: animationController, curve: Curves.easeOut),
+      axisAlignment: 0.0,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 10.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(right: 16.0),
+              child: CircleAvatar(child: Text(_name[0])),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_name, style: Theme.of(context).textTheme.headline5),
+                Container(
+                  margin: const EdgeInsets.only(top: 5.0),
+                  child: Text(text),
+                )
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
 
@@ -25,8 +68,11 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
+  final List<ChatMessage> _messages = [];
   final _textcontroller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  bool _isComposing = false;
 
   @override
   Widget build(BuildContext context) {
@@ -34,22 +80,84 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: const Text("FriendlyChat"),
       ),
-      body: _buildTextComposer(),
+      body: Column(
+        children: [
+          Flexible(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(8.0),
+              reverse: true,
+              itemBuilder: (_, index) => _messages[index],
+              itemCount: _messages.length,
+            ),
+          ),
+          const Divider(height: 1.0),
+          Container(
+            decoration: BoxDecoration(color: Theme.of(context).cardColor),
+            child: _buildTextComposer(),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildTextComposer() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8.0),
-      child: TextField(
-        controller: _textcontroller,
-        onSubmitted: _handleSubmitted,
-        decoration: const InputDecoration.collapsed(hintText: "Send a message"),
+    return IconTheme(
+      data: IconThemeData(color: Theme.of(context).colorScheme.secondary),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Row(
+          children: [
+            Flexible(
+              child: TextField(
+                controller: _textcontroller,
+                onSubmitted: _isComposing ? _handleSubmitted : null,
+                decoration:
+                    const InputDecoration.collapsed(hintText: "Send a message"),
+                focusNode: _focusNode,
+                onChanged: (text) {
+                  setState(() {
+                    _isComposing = text.isNotEmpty;
+                  });
+                },
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: IconButton(
+                icon: const Icon(Icons.send),
+                onPressed: _isComposing
+                    ? () => _handleSubmitted(_textcontroller.text)
+                    : null,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   void _handleSubmitted(String text) {
     _textcontroller.clear();
+    var message = ChatMessage(
+      text: text,
+      animationController: AnimationController(
+        duration: const Duration(milliseconds: 1000),
+        vsync: this,
+      ),
+    );
+    setState(() {
+      _isComposing = false;
+      _messages.insert(0, message);
+    });
+    _focusNode.requestFocus();
+    message.animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    for (var message in _messages) {
+      message.animationController.dispose();
+    }
+    super.dispose();
   }
 }
